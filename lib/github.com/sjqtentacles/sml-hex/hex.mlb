@@ -1,0 +1,8 @@
+(* MLton basis file for the sml-hex library.
+ * Brings `structure Hex` (matching HEX) into scope. *)
+local
+  $(SML_LIB)/basis/basis.mlb
+in
+  hex.sig
+  hex.sml
+end
