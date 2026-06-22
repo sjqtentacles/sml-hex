@@ -1,26 +1,22 @@
-(* Dependency-free test runner for the Hex structure.
- * Prints one line per assertion and exits non-zero if any assertion fails. *)
+(* Test suite for the Hex structure, standardized on the shared
+ * sml-test Harness. *)
 
-val passed = ref 0
-val failed = ref 0
+structure Tests =
+struct
+  open Harness
 
-fun check (name : string) (cond : bool) : unit =
-    if cond
-    then (passed := !passed + 1; print ("ok   - " ^ name ^ "\n"))
-    else (failed := !failed + 1; print ("FAIL - " ^ name ^ "\n"))
+  structure H = Hex
 
-structure H = Hex
+  fun bytes l = Word8Vector.fromList (map Word8.fromInt l)
+  fun vecEq (a, b) =
+      Word8Vector.length a = Word8Vector.length b
+      andalso let fun same i = i >= Word8Vector.length a
+                             orelse (Word8Vector.sub (a, i) = Word8Vector.sub (b, i)
+                                     andalso same (i + 1))
+              in same 0 end
 
-fun bytes l = Word8Vector.fromList (map Word8.fromInt l)
-fun vecEq (a, b) =
-    Word8Vector.length a = Word8Vector.length b
-    andalso let fun same i = i >= Word8Vector.length a
-                           orelse (Word8Vector.sub (a, i) = Word8Vector.sub (b, i)
-                                   andalso same (i + 1))
-            in same 0 end
-
-fun run () =
-  let
+  fun run () =
+    let
     (* ---- encode known vectors ---- *)
     val () = check "encode empty" (H.encode (bytes []) = "")
     val () = check "encode 'abc' bytes" (H.encode (bytes [0x61, 0x62, 0x63]) = "616263")
@@ -84,9 +80,6 @@ fun run () =
     val () = check "encodeString known"
                    (H.encodeString "ML" = "4d4c")
   in
-    print ("\n" ^ Int.toString (!passed) ^ " passed, "
-           ^ Int.toString (!failed) ^ " failed\n");
-    OS.Process.exit (if !failed = 0 then OS.Process.success else OS.Process.failure)
+    Harness.run ()
   end
-
-val () = run ()
+end
