@@ -27,4 +27,30 @@ sig
   val encodeString : string -> string
   (* Convenience: decode to a string of bytes. NONE on malformed input. *)
   val decodeString : string -> string option
+
+  (* --- digit / byte helpers --- *)
+
+  (* Map a nibble value 0..15 to its lowercase hex digit. Raises Domain for
+     any value outside 0..15. *)
+  val toHexDigit : int -> char
+  (* Parse a single hex digit (upper or lower case) to its value, or NONE. *)
+  val fromHexDigit : char -> int option
+  (* Encode a single byte as two lowercase hex digits. *)
+  val byteToHex : Word8.word -> string
+
+  (* --- tolerant decode --- *)
+
+  (* Like `decode`, but first strips ASCII whitespace (space, tab, CR, LF) and
+     a single optional leading "0x"/"0X" prefix. Still returns NONE on an odd
+     number of remaining digits or any non-hex character. *)
+  val decodeLoose : string -> Word8Vector.vector option
+
+  (* --- hexdump (xxd-style) --- *)
+
+  (* Format bytes as a classic hexdump: 16 bytes per line, each line is
+       OFFSET(8 hex)  <up to 16 space-separated hex bytes>  |ascii gutter|
+     Non-printable bytes appear as '.' in the gutter. Returns "" for empty. *)
+  val hexdump : Word8Vector.vector -> string
+  (* Hexdump the bytes of a string. *)
+  val hexdumpString : string -> string
 end

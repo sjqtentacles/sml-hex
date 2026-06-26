@@ -59,4 +59,74 @@ struct
       case decode s of
           SOME v => SOME (Byte.bytesToString v)
         | NONE => NONE
+
+  (* --- digit / byte helpers --- *)
+
+  fun toHexDigit n =
+      if n >= 0 andalso n <= 15 then String.sub (lowerDigits, n)
+      else raise Domain
+
+  fun fromHexDigit c = digitVal c
+
+  fun byteToHex b =
+      let val hi = Word8.toInt (Word8.>> (b, 0w4))
+          val lo = Word8.toInt (Word8.andb (b, 0wxF))
+      in String.implode [toHexDigit hi, toHexDigit lo] end
+
+  (* --- tolerant decode --- *)
+
+  fun decodeLoose s =
+      let
+        fun isWs c = c = #" " orelse c = #"\t" orelse c = #"\n" orelse c = #"\r"
+        val noWs = String.implode (List.filter (fn c => not (isWs c))
+                                                (String.explode s))
+        val stripped =
+            if String.isPrefix "0x" noWs orelse String.isPrefix "0X" noWs
+            then String.extract (noWs, 2, NONE)
+            else noWs
+      in
+        decode stripped
+      end
+
+  (* --- hexdump (xxd-style) --- *)
+
+  fun hexdump v =
+      let
+        val n = Word8Vector.length v
+        fun byte i = Word8.toInt (Word8Vector.sub (v, i))
+        (* 8-digit zero-padded hex offset *)
+        fun offset i =
+            let
+              fun go (x, acc, k) =
+                  if k = 0 then acc
+                  else go (x div 16, String.str (toHexDigit (x mod 16)) ^ acc, k - 1)
+            in go (i, "", 8) end
+        (* one line covering [base, base+16) *)
+        fun line base =
+            let
+              val cols =
+                  List.tabulate (16, fn j =>
+                    let val i = base + j in
+                      if i < n then byteToHex (Word8Vector.sub (v, i)) else "  "
+                    end)
+              (* group into two 8-byte halves separated by an extra space *)
+              val left = String.concatWith " " (List.take (cols, 8))
+              val right = String.concatWith " " (List.drop (cols, 8))
+              val hexPart = left ^ "  " ^ right
+              val gutter =
+                  String.implode (List.tabulate (Int.min (16, n - base), fn j =>
+                    let val c = byte (base + j) in
+                      if c >= 32 andalso c < 127 then Char.chr c else #"."
+                    end))
+            in
+              offset base ^ "  " ^ hexPart ^ "  |" ^ gutter ^ "|"
+            end
+        fun loop base acc =
+            if base >= n then List.rev acc
+            else loop (base + 16) (line base :: acc)
+      in
+        if n = 0 then "" else String.concatWith "\n" (loop 0 []) ^ "\n"
+      end
+
+  fun hexdumpString s = hexdump (Byte.stringToBytes s)
 end

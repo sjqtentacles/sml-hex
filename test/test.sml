@@ -79,6 +79,60 @@ struct
     val () = check "decodeString malformed is NONE" (H.decodeString "xyz" = NONE)
     val () = check "encodeString known"
                    (H.encodeString "ML" = "4d4c")
+
+    (* ---- digit / byte helpers ---- *)
+    val () = check "toHexDigit 0" (H.toHexDigit 0 = #"0")
+    val () = check "toHexDigit 10" (H.toHexDigit 10 = #"a")
+    val () = check "toHexDigit 15" (H.toHexDigit 15 = #"f")
+    val () = checkRaises "toHexDigit 16 raises Domain"
+                   (fn () => H.toHexDigit 16)
+    val () = checkRaises "toHexDigit ~1 raises Domain"
+                   (fn () => H.toHexDigit ~1)
+    val () = check "fromHexDigit '0'" (H.fromHexDigit #"0" = SOME 0)
+    val () = check "fromHexDigit 'a'" (H.fromHexDigit #"a" = SOME 10)
+    val () = check "fromHexDigit 'F'" (H.fromHexDigit #"F" = SOME 15)
+    val () = check "fromHexDigit 'g' is NONE" (H.fromHexDigit #"g" = NONE)
+    val () = check "byteToHex 0x00" (H.byteToHex (Word8.fromInt 0) = "00")
+    val () = check "byteToHex 0xDE" (H.byteToHex (Word8.fromInt 0xDE) = "de")
+    val () = check "byteToHex 0xFF" (H.byteToHex (Word8.fromInt 255) = "ff")
+
+    (* ---- tolerant decode ---- *)
+    val () = check "decodeLoose strips spaces"
+                   (H.decodeLoose "de ad be ef" = H.decode "deadbeef")
+    val () = check "decodeLoose strips mixed whitespace"
+                   (H.decodeLoose "de ad\nbe\tef" = H.decode "deadbeef")
+    val () = check "decodeLoose strips 0x prefix"
+                   (H.decodeLoose "0xDEAD" = H.decode "DEAD")
+    val () = check "decodeLoose strips 0X prefix"
+                   (H.decodeLoose "0Xdead" = H.decode "dead")
+    val () = check "decodeLoose 0x with internal spaces"
+                   (H.decodeLoose "0x DE AD" = H.decode "DEAD")
+    val () = check "decodeLoose still NONE on odd length"
+                   (H.decodeLoose "abc" = NONE)
+    val () = check "decodeLoose still NONE on bad digit"
+                   (H.decodeLoose "zz" = NONE)
+    val () = check "decodeLoose empty"
+                   (case H.decodeLoose "  \n " of SOME v => vecEq (v, bytes []) | NONE => false)
+
+    (* ---- hexdump ---- *)
+    val dump = H.hexdumpString "hello"
+    val () = check "hexdump has offset 00000000"
+                   (String.isSubstring "00000000" dump)
+    val () = check "hexdump has hex bytes"
+                   (String.isSubstring "68 65 6c 6c 6f" dump)
+    val () = check "hexdump has ascii gutter"
+                   (String.isSubstring "|hello|" dump)
+    val () = check "hexdump empty is \"\""
+                   (H.hexdump (bytes []) = "")
+    (* non-printables render as '.' in the gutter *)
+    val ctrlDump = H.hexdump (bytes [0x00, 0x41, 0x7f])
+    val () = check "hexdump non-printable as dot"
+                   (String.isSubstring "|.A.|" ctrlDump)
+    (* a full 16-byte line plus a partial second line *)
+    val seventeen = bytes (List.tabulate (17, fn i => i))
+    val bigDump = H.hexdumpString (Byte.bytesToString seventeen)
+    val () = check "hexdump second line offset 00000010"
+                   (String.isSubstring "00000010" bigDump)
   in
     Harness.run ()
   end
