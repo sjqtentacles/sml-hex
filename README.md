@@ -85,6 +85,38 @@ print (Hex.hexdumpString "hello")
 | `hexdump : Word8Vector.vector -> string` | xxd-style dump: offset, 16 hex columns, ASCII gutter. |
 | `hexdumpString : string -> string` | `hexdump` of a string's bytes. |
 
+## Example
+
+`make example` builds and runs [`examples/demo.sml`](examples/demo.sml), which
+walks encode/decode round-trips, the string wrappers, digit helpers, tolerant
+decoding, and a hexdump (output is byte-identical under MLton and Poly/ML):
+
+```
+Encoding bytes to hex:
+  encode      = deadbeef
+  encodeUpper = DEADBEEF
+
+Decoding hex to bytes:
+  decode "deadbeef"         -> deadbeef
+  decode "abc" (odd length) -> NONE
+  decode "zz" (bad digit)   -> NONE
+
+String convenience wrappers:
+  encodeString "ML"   = 4d4c
+  decodeString "4d4c" = ML
+
+Digit / byte helpers:
+  toHexDigit 10      = a
+  fromHexDigit #"F"  = 15
+  byteToHex 0xDE     = de
+
+Tolerant decodeLoose (whitespace + "0x" prefix):
+  decodeLoose "0x DE AD\tBE EF" -> deadbeef
+
+Hexdump:
+00000000  53 74 61 6e 64 61 72 64  20 4d 4c 21              |Standard ML!|
+```
+
 ## Scope and limitations
 
 - `decodeLoose` strips only ASCII whitespace (space, tab, CR, LF) and a single
