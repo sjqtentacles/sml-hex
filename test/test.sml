@@ -133,6 +133,84 @@ struct
     val bigDump = H.hexdumpString (Byte.bytesToString seventeen)
     val () = check "hexdump second line offset 00000010"
                    (String.isSubstring "00000010" bigDump)
+
+    (* ---- Properties (sml-check) ----
+       decode-of-encode is the central law for this codec: for any byte
+       vector, decoding what we just encoded must return the original
+       bytes. Fixed vector tests above only cover a handful of hand-picked
+       inputs; these properties fuzz across random lengths and byte
+       content. *)
+    val () = section "Properties (sml-check)"
+
+    (* Random byte vectors of length 0..64, covering every byte value. *)
+    val genBytes : Word8Vector.vector Check.gen =
+      Check.map (fn xs => Word8Vector.fromList (List.map Word8.fromInt xs))
+        (Check.resize 64 (Check.listOf (Check.choose (0, 255))))
+
+    fun showBytes (v : Word8Vector.vector) : string =
+      String.concat
+        (List.map (fn b => Int.toString (Word8.toInt b) ^ " ")
+           (Word8Vector.foldr (op::) [] v))
+
+    (* Random strings of length 0..64, covering every byte value. *)
+    val genStr : string Check.gen =
+      Check.map (String.implode o List.map Char.chr)
+        (Check.resize 64 (Check.listOf (Check.choose (0, 255))))
+
+    fun showStr (s : string) : string =
+      "\"" ^
+      String.concat
+        (List.map
+           (fn c =>
+              let val n = Char.ord c
+                  fun hx d = if d < 10 then Char.chr (d + 48) else Char.chr (d + 87)
+              in String.implode [hx (n div 16), hx (n mod 16)] end)
+           (String.explode s))
+      ^ "\""
+
+    val () =
+      check "prop: decode(encode bytes) round-trips"
+        (case Check.quickCheck
+                (Check.forAll genBytes showBytes
+                   (fn v => case H.decode (H.encode v) of
+                                SOME v' => vecEq (v, v')
+                              | NONE => false)) of
+             Check.Passed _ => true
+           | Check.Failed _ => false)
+
+    val () =
+      check "prop: encode output is exactly 2x input length"
+        (case Check.quickCheck
+                (Check.forAll genBytes showBytes
+                   (fn v => String.size (H.encode v) = 2 * Word8Vector.length v)) of
+             Check.Passed _ => true
+           | Check.Failed _ => false)
+
+    val () =
+      check "prop: decode(encodeUpper bytes) round-trips (case-insensitive)"
+        (case Check.quickCheck
+                (Check.forAll genBytes showBytes
+                   (fn v => case H.decode (H.encodeUpper v) of
+                                SOME v' => vecEq (v, v')
+                              | NONE => false)) of
+             Check.Passed _ => true
+           | Check.Failed _ => false)
+
+    val () =
+      check "prop: decodeString(encodeString s) round-trips"
+        (case Check.quickCheck
+                (Check.forAll genStr showStr
+                   (fn s => H.decodeString (H.encodeString s) = SOME s)) of
+             Check.Passed _ => true
+           | Check.Failed _ => false)
+
+    val () =
+      check "prop: encode is deterministic"
+        (case Check.quickCheck
+                (Check.forAll genBytes showBytes
+                   (fn v => H.encode v = H.encode v)) of
+             Check.Passed _ => true
+           | Check.Failed _ => false)
   in
     Harness.run ()
   end
